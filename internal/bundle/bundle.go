@@ -35,6 +35,8 @@ type Manifest struct {
 	Files   []File  `json:"files"`
 }
 
+const ImagePrefix = "airgapproof.local/image:"
+
 func HashFile(path string) (string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -68,11 +70,14 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 	copyConfig.Isolation.VMFirmware = ""
 	copyConfig.Isolation.VMBinary = ""
 	images := []string{c.Artifacts.HelperImage}
+	var composition *compose.Project
+	var workload *kube.Manifest
 	if c.Application.Compose != "" {
 		p, err := compose.Load(ctx, c)
 		if err != nil {
 			return err
 		}
+		composition = p
 		images = append(images, p.Images()...)
 		copyArtifact := func(source string) (string, error) {
 			rel, err := filepath.Rel(c.BaseDir, source)
@@ -117,25 +122,15 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 				}
 			}
 		}
-		b, err := json.MarshalIndent(p.Model, "", "  ")
-		if err != nil {
-			return err
-		}
-		if err = engine.WritePrivate(filepath.Join(dir, "compose.json"), b); err != nil {
-			return err
-		}
 		copyConfig.Application.Compose = "compose.json"
 	} else {
 		m, err := kube.Load(c)
 		if err != nil {
 			return err
 		}
+		workload = m
 		images = append(images, m.Images...)
 		images = append(images, c.Application.NodeImage)
-		b, _ := json.MarshalIndent(m.List(), "", "  ")
-		if err = engine.WritePrivate(filepath.Join(dir, "kubernetes.json"), b); err != nil {
-			return err
-		}
 		copyConfig.Application.Kubernetes = []string{"kubernetes.json"}
 	}
 	for _, path := range c.Artifacts.Files {
@@ -148,13 +143,6 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 		if err = copyTree(c.Path(path), filepath.Join(dir, path)); err != nil {
 			return err
 		}
-	}
-	b, err := yaml.Marshal(copyConfig)
-	if err != nil {
-		return err
-	}
-	if err = engine.WritePrivate(filepath.Join(dir, "airgapproof.yaml"), b); err != nil {
-		return err
 	}
 	manifest := Manifest{Version: 1}
 	seen := map[string]bool{}
@@ -170,6 +158,52 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 		}
 		unique = append(unique, image)
 		manifest.Images = append(manifest.Images, Image{Reference: image, ID: strings.TrimSpace(string(b))})
+	}
+	ids := map[string]string{}
+	for _, image := range manifest.Images {
+		ids[image.Reference] = ImagePrefix + strings.TrimPrefix(image.ID, "sha256:")
+	}
+	copyConfig.Artifacts.HelperImage = ids[c.Artifacts.HelperImage]
+	// Registry digest metadata can be lost; content-derived aliases also work with Kubernetes image-name parsing.
+	if composition != nil {
+		for _, value := range composition.Services {
+			s := value.(map[string]any)
+			s["image"] = ids[s["image"].(string)]
+		}
+		b, err := json.MarshalIndent(composition.Model, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err = engine.WritePrivate(filepath.Join(dir, "compose.json"), b); err != nil {
+			return err
+		}
+	} else {
+		copyConfig.Application.NodeImage = ids[c.Application.NodeImage]
+		for _, object := range workload.Objects {
+			spec := kube.PodSpec(object)
+			for _, key := range []string{"containers", "initContainers"} {
+				if containers, ok := spec[key].([]any); ok {
+					for _, value := range containers {
+						ct := value.(map[string]any)
+						ct["image"] = ids[ct["image"].(string)]
+					}
+				}
+			}
+		}
+		b, err := json.MarshalIndent(workload.List(), "", "  ")
+		if err != nil {
+			return err
+		}
+		if err = engine.WritePrivate(filepath.Join(dir, "kubernetes.json"), b); err != nil {
+			return err
+		}
+	}
+	b, err := yaml.Marshal(copyConfig)
+	if err != nil {
+		return err
+	}
+	if err = engine.WritePrivate(filepath.Join(dir, "airgapproof.yaml"), b); err != nil {
+		return err
 	}
 	if _, err = engine.Docker(ctx, append([]string{"image", "save", "--output", filepath.Join(dir, "images.tar")}, unique...)...); err != nil {
 		return err
@@ -263,9 +297,12 @@ func Load(ctx context.Context, dir string) error {
 		return err
 	}
 	for _, image := range m.Images {
-		b, err := engine.Docker(ctx, "image", "inspect", "--format", "{{.Id}}", image.Reference)
+		b, err := engine.Docker(ctx, "image", "inspect", "--format", "{{.Id}}", image.ID)
 		if err != nil || strings.TrimSpace(string(b)) != image.ID {
 			return fmt.Errorf("loaded image identity mismatch: %s", image.Reference)
+		}
+		if _, err = engine.Docker(ctx, "image", "tag", image.ID, ImagePrefix+strings.TrimPrefix(image.ID, "sha256:")); err != nil {
+			return err
 		}
 	}
 	return nil

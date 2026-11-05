@@ -19,6 +19,12 @@ PostgreSQL. Persist the two credentials through your own secret manager; startin
 an existing PostgreSQL volume with a different password doesn't rotate its stored
 database password.
 
+For an offline deployment, download the dashboard container archive for your
+architecture from Releases, verify its checksum, and use `docker load --input`
+to preload it. Preload `postgres:16-alpine` through your approved artifact process,
+then start Compose with `--no-build --pull never`. The source build path does
+not require registry authentication.
+
 For shared access, use a private HTTPS reverse proxy and set
 `AIRGAPPROOF_PUBLIC_URL` to its exact origin. This enables secure cookies and
 origin checks. The dashboard includes CSRF protection, HttpOnly and SameSite

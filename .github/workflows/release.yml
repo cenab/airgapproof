@@ -23,8 +23,16 @@ jobs:
               CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-X main.version=${GITHUB_REF_NAME#v}" -o "dist/$package/airgapproof" ./cmd/airgapproof
               cp README.md LICENSE "dist/$package/"
               cp -r docs "dist/$package/"
+              cp -r licenses "dist/$package/"
               tar -C dist -czf "dist/$package.tar.gz" "$package"
             done
+          done
+          for arch in amd64 arm64; do
+            version="${GITHUB_REF_NAME#v}"
+            docker build --platform "linux/$arch" -f Dockerfile.helper -t "ghcr.io/cenab/airgapproof-helper:$version" .
+            docker image save --platform "linux/$arch" "ghcr.io/cenab/airgapproof-helper:$version" | gzip > "dist/airgapproof-helper_${GITHUB_REF_NAME}_linux_${arch}.tar.gz"
+            docker build --platform "linux/$arch" -t "ghcr.io/cenab/airgapproof:$version" .
+            docker image save --platform "linux/$arch" "ghcr.io/cenab/airgapproof:$version" | gzip > "dist/airgapproof-dashboard_${GITHUB_REF_NAME}_linux_${arch}.tar.gz"
           done
           cd dist
           sha256sum ./*.tar.gz > SHA256SUMS

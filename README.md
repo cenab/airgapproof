@@ -48,6 +48,14 @@ bin/airgapproof test \
   --revision release-2026-11
 ```
 
+You can also download a CLI archive and the matching Linux helper container
+archive from [Releases](https://github.com/cenab/airgapproof/releases). Verify
+them against the release's `SHA256SUMS`, then preload the helper with
+`docker load --input airgapproof-helper_v0.1.0_linux_amd64.tar.gz`. Use `arm64`
+for Apple Silicon or an arm64 Docker engine. Container archives work without
+registry authentication; building the helper from source also avoids a registry
+account requirement.
+
 Use a profile that describes actual operations, rather than startup alone:
 
 ```yaml
@@ -149,6 +157,11 @@ and symlinks. Checksums establish bundle integrity relative to its manifest;
 they do not authenticate the manifest's publisher. Bundles can contain expanded
 configuration and secrets. Keep the bundle directory private and transfer it
 through your approved artifact process.
+
+The exported deployment uses local aliases derived from verified image content
+IDs. Tests reject aliases that no longer match those identities. Original image
+references remain in the manifest. This preserves pinned-image execution when
+Docker save/load does not restore registry-digest lookup metadata.
 
 ## Inspect dependencies and propose a fix
 

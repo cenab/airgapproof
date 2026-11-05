@@ -261,6 +261,9 @@ func checkArtifacts(ctx context.Context, c *config.Config, images []string, r *r
 		}
 		seen[image] = true
 		b, err := engine.Docker(ctx, "image", "inspect", "--format", "{{.Id}}", image)
+		if err == nil && strings.HasPrefix(image, bundle.ImagePrefix) && strings.TrimSpace(string(b)) != "sha256:"+strings.TrimPrefix(image, bundle.ImagePrefix) {
+			err = fmt.Errorf("bundle image alias no longer matches its content identity")
+		}
 		r.Artifacts = append(r.Artifacts, report.Artifact{Path: "image:" + image, SHA256: strings.TrimSpace(string(b)), Present: err == nil})
 		if err != nil {
 			missing = true

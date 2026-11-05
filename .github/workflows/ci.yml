@@ -75,4 +75,6 @@ jobs:
         if: always()
         with:
           name: disconnected-evidence
-          path: reports/vm-smoke/
+          path: |
+            reports/vm-smoke/
+            reports/vm-kubernetes/

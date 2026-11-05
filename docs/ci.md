@@ -24,6 +24,12 @@ jobs:
         with:
           go-version: '1.27.3'
       - run: go install github.com/cenab/airgapproof/cmd/airgapproof@v0.1.0
+      - name: Preload the released helper
+        run: |
+          curl -fLO https://github.com/cenab/airgapproof/releases/download/v0.1.0/airgapproof-helper_v0.1.0_linux_amd64.tar.gz
+          curl -fLO https://github.com/cenab/airgapproof/releases/download/v0.1.0/SHA256SUMS
+          sha256sum --check --ignore-missing SHA256SUMS
+          docker load --input airgapproof-helper_v0.1.0_linux_amd64.tar.gz
       - run: airgapproof prepare --config airgapproof.yaml --build
       - run: airgapproof test --config airgapproof.yaml --report airgap-report
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

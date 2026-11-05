@@ -19,15 +19,24 @@ Ubuntu 24.04 arm64 guest. Final command results are recorded below.
 | Disconnected VM smoke | Ready, with no virtual NIC and required eBPF tracing |
 | Full AI application in disconnected VM | Ready, 4/4 workflows |
 | Kubernetes example | Ready, 3/3 workflows: HTTP, exec, and rollout recovery |
+| Kubernetes inside a disconnected VM | Ready, 3/3 workflows with required tracing and no virtual NIC |
 | PostgreSQL dashboard integration | Passed: persistent reports, team isolation, authentication, token rotation, and CSRF rejection |
 | Signed report verification | Passed against an explicitly trusted public key |
 | Proposed Dockerfile patch | Accepted by `git apply --check` |
+| Race detector, vet, workflow lint, and vulnerability scan | Passed; govulncheck found no known reachable vulnerabilities |
+| Live CLI dashboard publication | Accepted signed evidence returns 0; VM-only policy rejection returns 1 |
 
 The live sandbox test reproduced a Docker local-log-driver startup error before
 the log-rotation setting was corrected. A regression test also reproduced local
 unspecified sockets being classified as external before the shared address
 classification was fixed. The AI application provides both a demonstrated
 offline failure and a demonstrated self-contained pass.
+
+A digest-pinned kind image reproduced an offline image-identity lookup failure
+after Docker save/load. The regression test failed before the fix and passed
+afterward. Bundles now create content-derived local aliases, verify their image
+identities, and use those aliases for both Compose and Kubernetes. The combined
+no-NIC Kubernetes run also exercises this path with an actual image import.
 
 ## Reproduce the checks
 
@@ -45,7 +54,9 @@ sh scripts/check-vm.sh
 ```
 
 The GitHub workflow also tests Linux amd64, a separately provisioned Ubuntu VM,
-artifact export/load/re-execution, and signed evidence. Inspect the
+Kubernetes in that VM, artifact export/load/re-execution, and signed evidence.
+The [first full CI run](https://github.com/cenab/airgapproof/actions/runs/41997277802)
+passed all four jobs. Inspect the
 [repository's workflow runs](https://github.com/cenab/airgapproof/actions) for
 the exact commit and completed job results.
 

@@ -75,3 +75,36 @@ assert report['isolation']['verified'] and report['isolation']['tracing']
 assert any('-nic none' in check for check in report['isolation']['checks'])
 print('Verified disconnected guest workflows and required runtime tracing.')
 PY
+
+python3 - "$ap_tmp" "$ap_base" "$ap_arch" "$ap_firmware" "$ap_root" <<'PY'
+import json
+import pathlib
+import sys
+root, image, arch, firmware, repository = sys.argv[1:]
+profile = {'version': 1,
+           'application': {'name': 'Disconnected Kubernetes', 'kubernetes': [repository + '/examples/kubernetes/app.yaml']},
+           'isolation': {'mode': 'disconnected', 'tracing': 'required', 'vm_image': image,
+                         'vm_arch': arch, 'vm_binary': root + '/airgapproof-linux'},
+           'scenarios': [{'name': 'web', 'type': 'http', 'url': 'http://web/',
+                          'expected_status': 200, 'expected_contains': 'Welcome to nginx', 'timeout': '60s'},
+                         {'name': 'configuration', 'type': 'exec', 'service': 'deployment/web',
+                          'command': ['nginx', '-t'], 'expected_exit_code': 0},
+                         {'name': 'recovery', 'type': 'restart', 'service': 'deployment/web',
+                          'verify': 'web', 'timeout': '60s'}]}
+if firmware:
+    profile['isolation']['vm_firmware'] = firmware
+pathlib.Path(root, 'kubernetes-profile.yaml').write_text(json.dumps(profile))
+PY
+bin/airgapproof prepare --config "$ap_tmp/kubernetes-profile.yaml"
+bin/airgapproof test --config "$ap_tmp/kubernetes-profile.yaml" --report "$ap_root/reports/vm-kubernetes" --timeout 20m
+python3 - "$ap_root/reports/vm-kubernetes/report.json" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as stream:
+    report = json.load(stream)
+assert report['status'] == 'ready' and len(report['scenarios']) == 3
+assert report['isolation']['mode'] == 'disconnected'
+assert report['isolation']['backend'] == 'kubernetes'
+assert report['isolation']['verified'] and report['isolation']['tracing']
+print('Verified Kubernetes HTTP, exec, and rollout recovery inside a disconnected guest.')
+PY

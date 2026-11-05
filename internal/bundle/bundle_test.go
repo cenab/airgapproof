@@ -1,6 +1,7 @@
 package bundle
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -27,6 +28,23 @@ func fixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+func TestLoadUsesContentIdentityWithoutRegistryMetadata(t *testing.T) {
+	dir := fixture(t)
+	tools := t.TempDir()
+	script := `#!/bin/sh
+if [ "$1 $2" = "image load" ]; then exit 0; fi
+if [ "$1 $2" = "image inspect" ] && [ "$5" = "sha256:abc" ]; then printf '%s\n' 'sha256:abc'; exit 0; fi
+if [ "$1 $2" = "image tag" ] && [ "$3" = "sha256:abc" ] && [ "$4" = "airgapproof.local/image:abc" ]; then exit 0; fi
+exit 1
+`
+	if err := os.WriteFile(filepath.Join(tools, "docker"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if err := Load(context.Background(), dir); err != nil {
+		t.Fatal(err)
+	}
 }
 func TestVerifyTamperingAndExtraFiles(t *testing.T) {
 	dir := fixture(t)
