@@ -66,6 +66,7 @@ bin/airgapproof prepare --config "$ap_tmp/airgapproof.yaml"
 bin/airgapproof test --config "$ap_tmp/airgapproof.yaml" --report "$ap_root/reports/vm-smoke" --timeout 20m
 python3 - "$ap_root/reports/vm-smoke/report.json" <<'PY'
 import json
+import os
 import sys
 with open(sys.argv[1]) as stream:
     report = json.load(stream)
@@ -73,6 +74,8 @@ assert report['status'] == 'ready'
 assert report['isolation']['mode'] == 'disconnected'
 assert report['isolation']['verified'] and report['isolation']['tracing']
 assert any('-nic none' in check for check in report['isolation']['checks'])
+if os.environ.get('AIRGAPPROOF_REQUIRE_KVM') == '1':
+    assert any('-accel kvm' in check for check in report['isolation']['checks']), 'KVM access was lost between guest boots'
 print('Verified disconnected guest workflows and required runtime tracing.')
 PY
 
@@ -99,6 +102,7 @@ bin/airgapproof prepare --config "$ap_tmp/kubernetes-profile.yaml"
 bin/airgapproof test --config "$ap_tmp/kubernetes-profile.yaml" --report "$ap_root/reports/vm-kubernetes" --timeout 20m
 python3 - "$ap_root/reports/vm-kubernetes/report.json" <<'PY'
 import json
+import os
 import sys
 with open(sys.argv[1]) as stream:
     report = json.load(stream)
@@ -106,5 +110,7 @@ assert report['status'] == 'ready' and len(report['scenarios']) == 3
 assert report['isolation']['mode'] == 'disconnected'
 assert report['isolation']['backend'] == 'kubernetes'
 assert report['isolation']['verified'] and report['isolation']['tracing']
+if os.environ.get('AIRGAPPROOF_REQUIRE_KVM') == '1':
+    assert any('-accel kvm' in check for check in report['isolation']['checks']), 'KVM access was lost between guest boots'
 print('Verified Kubernetes HTTP, exec, and rollout recovery inside a disconnected guest.')
 PY

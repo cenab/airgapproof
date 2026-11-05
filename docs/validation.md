@@ -45,6 +45,12 @@ The VM allocation was raised from two vCPUs/2 GiB to four vCPUs/4 GiB, and CI
 checks available KVM access. Bootstrap diagnostics and the selected accelerator
 are recorded for interpreting subsequent runs.
 
+The resource recheck passed the VM smoke, but its Kubernetes bootstrap still
+timed out. Its evidence showed KVM during preparation and software emulation
+during both test boots. CI now starts the entire VM sequence with the runner's
+`kvm` group and asserts that hardware acceleration remains active when provided.
+This replaces the one-time device ACL used by the failed run.
+
 A subsequent local resource recheck was cancelled when the host ran low on disk;
 it is not counted as a passing run. Temporary test files were cleared. Export and
 VM execution now check estimated disk requirements with a host reserve, and the
