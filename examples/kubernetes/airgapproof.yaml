@@ -1,0 +1,27 @@
+version: 1
+application:
+  name: Kubernetes offline web
+  kubernetes: [app.yaml]
+  node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+isolation:
+  mode: developer
+  tracing: auto
+scenarios:
+  - name: web
+    type: http
+    url: http://web/
+    expected_status: 200
+    expected_contains: Welcome to nginx
+    timeout: 60s
+  - name: configuration
+    type: exec
+    service: deployment/web
+    command: [nginx, -t]
+    expected_exit_code: 0
+  - name: recovery
+    type: restart
+    service: deployment/web
+    verify: web
+    timeout: 60s
+report:
+  formats: [json, html, sarif]

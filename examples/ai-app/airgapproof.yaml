@@ -1,0 +1,39 @@
+version: 1
+application:
+  name: Offline AI platform
+  compose: compose.offline.yaml
+isolation:
+  mode: developer
+  tracing: auto
+  deny_external_network: true
+  allow_internal_services: true
+artifacts:
+  require_preloaded_images: true
+scenarios:
+  - name: api-health
+    type: http
+    url: http://api:8080/health
+    expected_status: 200
+    timeout: 45s
+  - name: inference-and-storage
+    type: http
+    method: POST
+    url: http://api:8080/workflow
+    headers:
+      Content-Type: application/json
+    body: '{"text":"Applications can run without internet access."}'
+    expected_status: 200
+    expected_contains: '"dimensions":384'
+    timeout: 20s
+  - name: redis-read-write
+    type: exec
+    service: redis
+    command: [redis-cli, ping]
+    expected_exit_code: 0
+  - name: restart-recovery
+    type: restart
+    service: api
+    verify: api-health
+    timeout: 45s
+report:
+  formats: [json, html, sarif]

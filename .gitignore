@@ -1,0 +1,9 @@
+/bin/
+/dist/
+/reports/
+/.work/
+*.qcow2
+*.iso
+*.key
+.env
+coverage.out

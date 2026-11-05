@@ -1,0 +1,9 @@
+.git
+.work
+bin
+dist
+reports
+*.qcow2
+*.iso
+*.key
+.env

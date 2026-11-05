@@ -1,0 +1,33 @@
+services:
+  dashboard:
+    image: ghcr.io/cenab/airgapproof:0.1.0
+    build:
+      context: ..
+    ports:
+      - 127.0.0.1:8080:8080
+    environment:
+      AIRGAPPROOF_DATABASE_URL: postgresql://airgapproof:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/airgapproof?sslmode=disable
+      AIRGAPPROOF_ADMIN_TOKEN: ${AIRGAPPROOF_ADMIN_TOKEN:?set AIRGAPPROOF_ADMIN_TOKEN}
+    command: [serve, --listen, '0.0.0.0:8080', --public-url, '${AIRGAPPROOF_PUBLIC_URL:-http://127.0.0.1:8080}']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: airgapproof
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: airgapproof
+    volumes: [evidence:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U airgapproof -d airgapproof]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
+volumes:
+  evidence: {}

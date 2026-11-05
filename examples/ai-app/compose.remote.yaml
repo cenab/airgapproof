@@ -1,0 +1,35 @@
+services:
+  api:
+    image: airgapproof-demo:remote
+    build:
+      context: .
+      target: remote
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  inference:
+    image: airgapproof-demo:remote
+    command: [uvicorn, inference:app, --host, 0.0.0.0, --port, '8080']
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: demo
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U demo -d demo]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+    volumes: [data:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+volumes:
+  data: {}

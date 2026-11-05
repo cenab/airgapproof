@@ -1,0 +1,12 @@
+{
+  "name": "release-engineering",
+  "policy": {
+    "require_disconnected": true,
+    "require_tracing": true,
+    "fail_on_attempts": false,
+    "min_scenarios": 3,
+    "max_warnings": 20,
+    "require_signature": false,
+    "trusted_keys": []
+  }
+}
