@@ -11,6 +11,9 @@ func TestDisconnectedVMHasNoNICOrHostShare(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "-smp 4 -m 4096") {
+		t.Fatal("nested Kubernetes VM resource allocation missing:", joined)
+	}
 	if !strings.Contains(joined, "-nic none") || strings.Contains(joined, "user,model") || strings.Contains(joined, "virtfs") || strings.Contains(joined, "9p") {
 		t.Fatal(joined)
 	}

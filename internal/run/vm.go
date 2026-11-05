@@ -47,7 +47,7 @@ func QEMUArgs(disk, seed, arch, firmware string, online bool) (string, []string,
 			cpu = "host"
 		}
 	}
-	args := []string{"-machine", machine, "-accel", accel, "-cpu", cpu, "-smp", "2", "-m", "2048", "-nographic", "-no-reboot", "-monitor", "none", "-drive", "file=" + disk + ",if=virtio,format=qcow2", "-drive", "file=" + seed + ",if=virtio,format=raw,readonly=on"}
+	args := []string{"-machine", machine, "-accel", accel, "-cpu", cpu, "-smp", "4", "-m", "4096", "-nographic", "-no-reboot", "-monitor", "none", "-drive", "file=" + disk + ",if=virtio,format=qcow2", "-drive", "file=" + seed + ",if=virtio,format=raw,readonly=on"}
 	if firmware != "" {
 		args = append(args, "-bios", firmware)
 	}
@@ -86,6 +86,13 @@ func VMPrepare(ctx context.Context, cloudImage, output, arch, firmware string, l
 		return errors.New("VM output must not already exist")
 	}
 	if err = os.MkdirAll(filepath.Dir(output), 0700); err != nil {
+		return err
+	}
+	imageInfo, err := os.Stat(cloudImage)
+	if err != nil {
+		return err
+	}
+	if err = engine.RequireSpace(filepath.Dir(output), uint64(imageInfo.Size())+engine.DiskReserve); err != nil {
 		return err
 	}
 	dir, err := os.MkdirTemp(filepath.Dir(output), ".airgap-vm-")
@@ -135,6 +142,7 @@ poweroff
 	}
 	if log.Log != nil {
 		fmt.Fprintln(log.Log, "Provisioning a dedicated Ubuntu VM online; test runs will have no virtual NIC")
+		fmt.Fprintln(log.Log, "QEMU:", strings.Join(args[:10], " "))
 	}
 	b, err := engine.Run(ctx, nil, binary, args...)
 	if err != nil {
@@ -180,14 +188,29 @@ func VMTest(ctx context.Context, c *config.Config, opts Options) (*report.Report
 	if err = os.WriteFile(filepath.Join(seed, "airgapproof"), b, 0700); err != nil {
 		return nil, err
 	}
+	var inputBytes uint64
+	if err = filepath.WalkDir(seed, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		info, err := entry.Info()
+		if err == nil {
+			inputBytes += uint64(info.Size())
+		}
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if err = engine.RequireSpace(dir, 2*inputBytes+engine.DiskReserve); err != nil {
+		return nil, err
+	}
 	userData := cloudConfig(`mkdir -p /mnt/ap-input /work
 mount -o ro /dev/disk/by-label/cidata /mnt/ap-input
 cp /mnt/ap-input/airgapproof /usr/local/bin/airgapproof
 chmod 0755 /usr/local/bin/airgapproof
-cp -r /mnt/ap-input/bundle /work/bundle
 systemctl start docker
-airgapproof bundle load /work/bundle
-airgapproof test --config /work/bundle/airgapproof.yaml --report /work/report --timeout 15m || true
+airgapproof bundle load /mnt/ap-input/bundle
+airgapproof test --config /mnt/ap-input/bundle/airgapproof.yaml --report /work/report --timeout 15m || true
 test -s /work/report/report.json
 printf "\nAIRGAPPROOF_REPORT_BEGIN\n" > /dev/console
 base64 -w0 /work/report/report.json > /dev/console
@@ -216,6 +239,7 @@ poweroff
 		return nil, err
 	}
 	fmt.Fprintln(opts.Log, "Running disposable VM snapshot with -nic none")
+	fmt.Fprintln(opts.Log, "QEMU:", strings.Join(args[:10], " "))
 	out, err := engine.Run(ctx, nil, qemu, args...)
 	if err != nil {
 		return nil, err
@@ -247,6 +271,7 @@ poweroff
 		return nil, err
 	}
 	r.Isolation.Mode = "disconnected"
+	r.Isolation.Checks = append(r.Isolation.Checks, "QEMU resource configuration: "+strings.Join(args[:10], " "))
 	r.Isolation.Checks = append(r.Isolation.Checks, "QEMU was launched with -nic none; no virtual network card or host filesystem share was provided.", "Images and artifacts entered through a read-only ISO; execution used a disposable QCOW2 snapshot.")
 	r.Gaps = append(r.Gaps, "VM guest image and QEMU are part of the trusted computing base; application-to-hypervisor exploits are outside this test profile.")
 	r.Revision = opts.Revision

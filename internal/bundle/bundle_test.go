@@ -5,8 +5,36 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/cenab/airgapproof/internal/config"
 )
+
+func TestExportRefusesImageArchiveLargerThanAvailableDisk(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services:\n  api:\n    image: demo:local\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	tools := t.TempDir()
+	script := `#!/bin/sh
+if [ "$1 $2" = "image inspect" ]; then
+  if [ "$4" = '{{.Size}}' ]; then printf '%s\n' '9223372036854775807'; else printf '%s\n' 'sha256:abc'; fi
+  exit 0
+fi
+if [ "$1 $2" = "image save" ]; then touch "$4"; exit 0; fi
+exit 1
+`
+	if err := os.WriteFile(filepath.Join(tools, "docker"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
+	c := &config.Config{Version: 1, BaseDir: dir, Application: config.Application{Compose: "compose.yaml"}, Artifacts: config.Artifacts{HelperImage: "demo:local"}}
+	err := Export(context.Background(), c, filepath.Join(dir, "bundle"))
+	if err == nil || !strings.Contains(err.Error(), "insufficient disk space") {
+		t.Fatalf("expected a disk-space rejection, got %v", err)
+	}
+}
 
 func fixture(t *testing.T) string {
 	t.Helper()

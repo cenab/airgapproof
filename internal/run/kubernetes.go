@@ -104,7 +104,7 @@ func Kubernetes(ctx context.Context, c *config.Config, opts Options) (r *report.
 		return r, err
 	}
 	if _, err = engine.RunEnv(ctx, nil, []string{"KIND_EXPERIMENTAL_DOCKER_NETWORK=" + network}, "kind", "create", "cluster", "--retain", "--name", lab.Name, "--image", c.Application.NodeImage, "--config", path, "--kubeconfig", cluster.Kubeconfig, "--wait", "90s"); err != nil && !strings.Contains(engine.Diagnostic(err), "failed to get api server port") {
-		return r, err
+		return r, fmt.Errorf("kind bootstrap failed: %w\n%s", err, strings.TrimSpace(engine.Diagnostic(err)))
 	}
 	err = nil
 	node := lab.Name + "-control-plane"

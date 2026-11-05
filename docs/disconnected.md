@@ -42,6 +42,9 @@ For Linux amd64, use the `amd64` Ubuntu image and `--arch amd64`; the default BI
 boot does not require an explicit firmware file. A native Linux CLI can reuse
 its own executable in the guest. QEMU uses KVM or Apple's Hypervisor Framework
 when available for the host architecture, otherwise software emulation.
+Guests receive four vCPUs and 4 GiB of RAM so the operating system and a nested
+Kubernetes control plane have room to run. The chosen accelerator and allocation
+are printed and included in execution evidence. Software emulation is slower.
 
 ## Run the offline application
 
@@ -72,5 +75,9 @@ the outer no-NIC boundary. The host's original deployment and base disk are
 preserved.
 
 Allow enough disk space for the prepared guest, image archive, input ISO, and
-temporary snapshot. GPU passthrough, cross-architecture application emulation,
+temporary snapshot. Bundle export estimates image sizes and keeps a 2 GiB host
+reserve. Before creating the ISO, VM execution also checks space for the ISO and
+an estimated guest snapshot. The guest reads its bundle directly from the ISO.
+These estimates cannot predict arbitrary disk writes made by an application.
+GPU passthrough, cross-architecture application emulation,
 Windows guests, and hypervisor exploit resistance are outside the tested profile.

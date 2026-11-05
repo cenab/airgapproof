@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/cenab/airgapproof/internal/compose"
@@ -146,6 +147,8 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 	}
 	manifest := Manifest{Version: 1}
 	seen := map[string]bool{}
+	seenIDs := map[string]bool{}
+	archiveBytes := engine.DiskReserve
 	unique := []string{}
 	for _, image := range images {
 		if seen[image] {
@@ -157,7 +160,20 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 			return fmt.Errorf("image is not preloaded: %s", image)
 		}
 		unique = append(unique, image)
-		manifest.Images = append(manifest.Images, Image{Reference: image, ID: strings.TrimSpace(string(b))})
+		id := strings.TrimSpace(string(b))
+		manifest.Images = append(manifest.Images, Image{Reference: image, ID: id})
+		if !seenIDs[id] {
+			b, err = engine.Docker(ctx, "image", "inspect", "--format", "{{.Size}}", image)
+			if err != nil {
+				return err
+			}
+			size, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 63)
+			if err != nil || size > ^uint64(0)-archiveBytes {
+				return fmt.Errorf("invalid image size: %s", image)
+			}
+			archiveBytes += size
+			seenIDs[id] = true
+		}
 	}
 	ids := map[string]string{}
 	for _, image := range manifest.Images {
@@ -203,6 +219,9 @@ func Export(ctx context.Context, c *config.Config, output string) error {
 		return err
 	}
 	if err = engine.WritePrivate(filepath.Join(dir, "airgapproof.yaml"), b); err != nil {
+		return err
+	}
+	if err = engine.RequireSpace(dir, archiveBytes); err != nil {
 		return err
 	}
 	if _, err = engine.Docker(ctx, append([]string{"image", "save", "--output", filepath.Join(dir, "images.tar")}, unique...)...); err != nil {
@@ -345,6 +364,9 @@ func copyTree(source, dest string) error {
 			return os.MkdirAll(target, info.Mode().Perm())
 		}
 		if err = os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+			return err
+		}
+		if err = engine.RequireSpace(filepath.Dir(target), uint64(info.Size())+engine.DiskReserve); err != nil {
 			return err
 		}
 		in, err := os.Open(path)

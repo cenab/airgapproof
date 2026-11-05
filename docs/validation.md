@@ -38,6 +38,18 @@ afterward. Bundles now create content-derived local aliases, verify their image
 identities, and use those aliases for both Compose and Kubernetes. The combined
 no-NIC Kubernetes run also exercises this path with an actual image import.
 
+The first combined Linux VM job passed its Compose smoke but failed kind startup
+before running Kubernetes workflows. That failure remains recorded in
+[its workflow run](https://github.com/cenab/airgapproof/actions/runs/41999957475).
+The VM allocation was raised from two vCPUs/2 GiB to four vCPUs/4 GiB, and CI
+checks available KVM access. Bootstrap diagnostics and the selected accelerator
+are recorded for interpreting subsequent runs.
+
+A subsequent local resource recheck was cancelled when the host ran low on disk;
+it is not counted as a passing run. Temporary test files were cleared. Export and
+VM execution now check estimated disk requirements with a host reserve, and the
+guest no longer duplicates the input image archive onto its writable disk.
+
 ## Reproduce the checks
 
 Use these commands from a clean checkout with Docker available:
