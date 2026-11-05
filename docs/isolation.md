@@ -33,7 +33,8 @@ Use a dedicated environment and the disconnected backend for higher assurance.
 The QEMU backend boots a snapshot of a prepared guest with `-nic none`. It
 provides no host filesystem share, host network proxy, or guest SSH channel.
 Preloaded images, artifacts, and a Linux CLI enter through a read-only ISO.
-Reports return over the VM console. The snapshot and temporary input disk are
+Reports return over a dedicated virtio serial port, isolated from system-console
+messages. The host validates bounded JSON output. The snapshot and temporary input disk are
 removed after execution, and the prepared base image is retained.
 
 Preparation is explicitly online. Application startup and workflows run in the

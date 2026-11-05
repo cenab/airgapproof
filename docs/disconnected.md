@@ -74,6 +74,11 @@ Compose or Kubernetes workflows. Reports record both inner sandbox checks and
 the outer no-NIC boundary. The host's original deployment and base disk are
 preserved.
 
+The guest returns JSON over a dedicated virtio serial port, separate from its
+system console. The host retains bounded output and validates the report before
+accepting evidence. See [QEMU character devices](https://www.qemu.org/docs/master/system/invocation.html)
+for the underlying transport.
+
 Allow enough disk space for the prepared guest, image archive, input ISO, and
 temporary snapshot. Bundle export estimates image sizes and keeps a 2 GiB host
 reserve. Before creating the ISO, VM execution also checks space for the ISO and

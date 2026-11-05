@@ -25,3 +25,16 @@ func TestDisconnectedVMHasNoNICOrHostShare(t *testing.T) {
 		t.Fatal("missing firmware accepted")
 	}
 }
+
+func TestOfflineEvidenceDoesNotShareTheSystemConsole(t *testing.T) {
+	_, args, err := QEMUArgs("/tmp/disk.qcow2", "/tmp/input.iso", "amd64", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	for _, required := range []string{"-serial null", "-chardev stdio,id=ap-report,signal=off", "-device virtio-serial-pci", "virtserialport,chardev=ap-report,name=org.airgapproof.report"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("missing dedicated evidence channel: %s", required)
+		}
+	}
+}

@@ -59,6 +59,11 @@ passed smoke (1/1) and nested Kubernetes (3/3), with KVM retained across
 preparation and both test boots. Both offline runs verified isolation and
 required tracing.
 
+A subsequent CI smoke failed while decoding evidence from the shared system
+console. Offline boots now return JSON over a dedicated virtio serial port;
+system-console output is excluded from that channel. The no-NIC and no-host-share
+boundary is preserved.
+
 A subsequent local resource recheck was cancelled when the host ran low on disk;
 it is not counted as a passing run. Temporary test files were cleared. Export and
 VM execution now check estimated disk requirements with a host reserve, and the

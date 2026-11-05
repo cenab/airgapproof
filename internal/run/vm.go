@@ -3,7 +3,6 @@ package run
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,7 +53,7 @@ func QEMUArgs(disk, seed, arch, firmware string, online bool) (string, []string,
 	if online {
 		args = append(args, "-nic", "user,model=virtio-net-pci")
 	} else {
-		args = append(args, "-nic", "none")
+		args = append(args, "-nic", "none", "-serial", "null", "-chardev", "stdio,id=ap-report,signal=off", "-device", "virtio-serial-pci", "-device", "virtserialport,chardev=ap-report,name=org.airgapproof.report")
 	}
 	return binary, args, nil
 }
@@ -212,9 +211,9 @@ systemctl start docker
 airgapproof bundle load /mnt/ap-input/bundle
 airgapproof test --config /mnt/ap-input/bundle/airgapproof.yaml --report /work/report --timeout 15m || true
 test -s /work/report/report.json
-printf "\nAIRGAPPROOF_REPORT_BEGIN\n" > /dev/console
-base64 -w0 /work/report/report.json > /dev/console
-printf "\nAIRGAPPROOF_REPORT_END\n" > /dev/console
+modprobe virtio_console
+udevadm settle
+cat /work/report/report.json > /dev/virtio-ports/org.airgapproof.report
 sync
 poweroff
 `)
@@ -244,28 +243,12 @@ poweroff
 	if err != nil {
 		return nil, err
 	}
-	begin := []byte("AIRGAPPROOF_REPORT_BEGIN\r\n")
-	index := bytes.LastIndex(out, begin)
-	if index < 0 {
-		begin = []byte("AIRGAPPROOF_REPORT_BEGIN\n")
-		index = bytes.LastIndex(out, begin)
-	}
-	if index < 0 {
+	if len(bytes.TrimSpace(out)) == 0 {
 		return nil, errors.New("disconnected VM did not return a report")
 	}
-	data := out[index+len(begin):]
-	end := bytes.Index(data, []byte("AIRGAPPROOF_REPORT_END"))
-	if end < 0 {
-		return nil, errors.New("disconnected VM returned an incomplete report")
-	}
-	data = bytes.TrimSpace(data[:end])
-	decoded, err := base64.StdEncoding.DecodeString(string(data))
-	if err != nil {
-		return nil, err
-	}
 	var r report.Report
-	if err = json.Unmarshal(decoded, &r); err != nil {
-		return nil, err
+	if err = json.Unmarshal(out, &r); err != nil {
+		return nil, fmt.Errorf("decode disconnected VM evidence: %w", err)
 	}
 	if err = r.Validate(); err != nil {
 		return nil, err
@@ -273,6 +256,7 @@ poweroff
 	r.Isolation.Mode = "disconnected"
 	r.Isolation.Checks = append(r.Isolation.Checks, "QEMU resource configuration: "+strings.Join(args[:10], " "))
 	r.Isolation.Checks = append(r.Isolation.Checks, "QEMU was launched with -nic none; no virtual network card or host filesystem share was provided.", "Images and artifacts entered through a read-only ISO; execution used a disposable QCOW2 snapshot.")
+	r.Isolation.Checks = append(r.Isolation.Checks, "Evidence returned over a dedicated virtio serial port, separate from the guest system console.")
 	r.Gaps = append(r.Gaps, "VM guest image and QEMU are part of the trusted computing base; application-to-hypervisor exploits are outside this test profile.")
 	r.Revision = opts.Revision
 	r.Signature = nil
