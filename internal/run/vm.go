@@ -239,7 +239,14 @@ poweroff
 	}
 	fmt.Fprintln(opts.Log, "Running disposable VM snapshot with -nic none")
 	fmt.Fprintln(opts.Log, "QEMU:", strings.Join(args[:10], " "))
-	out, err := engine.Run(ctx, nil, qemu, args...)
+	// Keep the serial backend connected without supplying guest input.
+	input, keepOpen, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	defer input.Close()
+	defer keepOpen.Close()
+	out, err := engine.Run(ctx, input, qemu, args...)
 	if err != nil {
 		return nil, err
 	}
