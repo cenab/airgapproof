@@ -72,8 +72,8 @@ jobs:
         run: |
           if [ -e /dev/kvm ]; then
             ls -l /dev/kvm
-            sudo -u "$(id -un)" -g kvm test -r /dev/kvm
-            sudo -u "$(id -un)" -g kvm test -w /dev/kvm
+            sudo runuser -u "$(id -un)" -g kvm -- test -r /dev/kvm
+            sudo runuser -u "$(id -un)" -g kvm -- test -w /dev/kvm
           else
             echo "KVM is unavailable; QEMU will use software emulation."
           fi
@@ -81,7 +81,7 @@ jobs:
       - name: Provision online, then test a guest without a NIC
         run: |
           if [ -e /dev/kvm ]; then
-            sudo -u "$(id -un)" -g kvm env "PATH=$PATH" AIRGAPPROOF_REQUIRE_KVM=1 sh scripts/check-vm.sh
+            sudo runuser -u "$(id -un)" -g kvm -G docker -- env "PATH=$PATH" AIRGAPPROOF_REQUIRE_KVM=1 sh scripts/check-vm.sh
           else
             sh scripts/check-vm.sh
           fi
