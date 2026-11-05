@@ -14,9 +14,13 @@ import (
 
 // LimitedBuffer consumes all output without retaining unbounded application data.
 type LimitedBuffer struct {
-	bytes.Buffer
-	Limit int
+	buffer bytes.Buffer
+	Limit  int
 }
+
+func (b *LimitedBuffer) Bytes() []byte  { return b.buffer.Bytes() }
+func (b *LimitedBuffer) String() string { return b.buffer.String() }
+
 type CommandError struct {
 	Name       string
 	Cause      error
@@ -35,12 +39,12 @@ func Diagnostic(err error) string {
 
 func (b *LimitedBuffer) Write(p []byte) (int, error) {
 	n := len(p)
-	left := b.Limit - b.Len()
+	left := b.Limit - b.buffer.Len()
 	if left > 0 {
 		if len(p) > left {
 			p = p[:left]
 		}
-		_, _ = b.Buffer.Write(p)
+		_, _ = b.buffer.Write(p)
 	}
 	return n, nil
 }

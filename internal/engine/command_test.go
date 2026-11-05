@@ -1,8 +1,10 @@
 package engine
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -32,5 +34,12 @@ func TestBoundedOutputStillConsumesAllBytes(t *testing.T) {
 	b := &LimitedBuffer{Limit: 3}
 	if n, err := b.Write([]byte("123456")); n != 6 || err != nil || b.String() != "123" {
 		t.Fatal(n, err, b.String())
+	}
+}
+
+func TestCommandDiagnosticsAreBounded(t *testing.T) {
+	_, err := Run(context.Background(), strings.NewReader(strings.Repeat("x", 8192)), "sh", "-c", "cat >&2; exit 1")
+	if ExitCode(err) != 1 || len(Diagnostic(err)) != 4096 {
+		t.Fatalf("exit=%d diagnostic bytes=%d", ExitCode(err), len(Diagnostic(err)))
 	}
 }

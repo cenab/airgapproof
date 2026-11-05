@@ -32,6 +32,10 @@ unspecified sockets being classified as external before the shared address
 classification was fixed. The AI application provides both a demonstrated
 offline failure and a demonstrated self-contained pass.
 
+A real child-process regression also reproduced command diagnostics exceeding
+their byte limit through an embedded buffer's streaming method. The shared
+command runner now retains only the bounded output, and the regression passes.
+
 A digest-pinned kind image reproduced an offline image-identity lookup failure
 after Docker save/load. The regression test failed before the fix and passed
 afterward. Bundles now create content-derived local aliases, verify their image
@@ -49,7 +53,11 @@ The resource recheck passed the VM smoke, but its Kubernetes bootstrap still
 timed out. Its evidence showed KVM during preparation and software emulation
 during both test boots. CI now starts the entire VM sequence with the runner's
 `kvm` group and asserts that hardware acceleration remains active when provided.
-This replaces the one-time device ACL used by the failed run.
+This replaces the one-time device ACL used by the failed run. The
+[following VM job](https://github.com/cenab/airgapproof/actions/runs/42007844587/job/127179266160)
+passed smoke (1/1) and nested Kubernetes (3/3), with KVM retained across
+preparation and both test boots. Both offline runs verified isolation and
+required tracing.
 
 A subsequent local resource recheck was cancelled when the host ran low on disk;
 it is not counted as a passing run. Temporary test files were cleared. Export and
